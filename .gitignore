@@ -51,6 +51,9 @@ release/
 
 # Generated
 android/app/src/main/assets/
+CLAUDE.md
+.claude
+.idea
 
 # ─── macOS ────────────────────────────────────────────────────────────────────
 .DS_Store

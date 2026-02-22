@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
@@ -28,11 +29,20 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions { jvmTarget = "17" }
-
     buildFeatures { compose = true }
 
-    composeOptions { kotlinCompilerExtensionVersion = "1.5.10" }
+    lint {
+        checkReleaseBuilds = false
+        // AGP 8.7.x bundles kotlinx-metadata-jvm that caps at Kotlin metadata 2.0.0;
+        // Kotlin 2.1.0 emits 2.1.0 metadata, crashing this detector at analysis time.
+        disable += "StateFlowValueCalledInComposition"
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 }
 
 dependencies {

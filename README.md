@@ -1,4 +1,4 @@
-# 🏋️ GymTracker — High-Speed Logging Ecosystem
+# GymTracker — High-Speed Logging Ecosystem
 
 A Kotlin Jetpack Compose Android app + FastAPI Python backend for lightning-fast gym and body metric logging on your own Raspberry Pi.
 
@@ -13,7 +13,7 @@ Android Phone  ──Retrofit──▶  FastAPI (Pi)  ──SQLite──▶  gym
 
 ---
 
-## 🥧 Backend — Raspberry Pi Setup
+## Backend — Raspberry Pi Setup
 
 ### Option A: Docker (Recommended)
 
@@ -73,7 +73,7 @@ sudo systemctl start gymtracker
 
 ---
 
-## 📱 Android App — Setup & Build
+## Android App — Setup & Build
 
 ### Prerequisites
 - Android Studio Hedgehog or newer
@@ -98,7 +98,7 @@ sudo systemctl start gymtracker
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 gym-tracker/
@@ -134,7 +134,7 @@ gym-tracker/
 
 ---
 
-## 🗄️ Database Schema
+## Database Schema
 
 ```sql
 -- Exercises available for selection
@@ -152,7 +152,7 @@ measurement_types (id, name)
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -173,7 +173,7 @@ measurement_types (id, name)
 
 ---
 
-## 🎨 UI Feature Highlights
+## UI Feature Highlights
 
 | Feature | Implementation |
 |---------|---------------|
@@ -188,7 +188,7 @@ measurement_types (id, name)
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 **"Network error" on Android:**
 - Ensure both phone and Pi are on the same WiFi
@@ -208,7 +208,7 @@ sudo usermod -aG docker pi && newgrp docker
 
 ---
 
-## 📈 Extending
+## Extending
 
 - **Add OAuth**: FastAPI supports OAuth2 with JWT — add `python-jose` and `passlib`
 - **Charts**: Swap Canvas chart for [Vico](https://patrykandpatrick.com/vico/) library (already in deps)
