@@ -2,7 +2,9 @@ package com.gymtracker.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,6 +34,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .background(Surface)
+            .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
         Text(
@@ -172,9 +175,39 @@ fun SettingsScreen(viewModel: MainViewModel) {
 
         Spacer(Modifier.height(20.dp))
 
+        // Sign Out Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Card),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Logout, null, tint = ErrorRed, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Account", color = OnSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick = { viewModel.signOut() },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Logout, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Sign Out", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
         // App info
         Text(
-            "GymTracker v1.0 · Built for the grind",
+            "Hum v1.0 · Built for the grind",
             color = SubText,
             fontSize = 11.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally)

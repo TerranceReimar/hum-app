@@ -38,7 +38,7 @@ private val DarkColors = darkColorScheme(
 )
 
 @Composable
-fun GymTrackerTheme(content: @Composable () -> Unit) {
+fun HumTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = DarkColors,
         content = content

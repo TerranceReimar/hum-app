@@ -24,8 +24,10 @@ import com.gymtracker.ui.UiEvent
 import com.gymtracker.ui.history.HistoryScreen
 import com.gymtracker.ui.home.HomeScreen
 import com.gymtracker.ui.manage.ManageScreen
+import com.gymtracker.ui.profile.ProfileLoginScreen
+import com.gymtracker.ui.profile.ProfileTabScreen
 import com.gymtracker.ui.settings.SettingsScreen
-import com.gymtracker.ui.theme.GymTrackerTheme
+import com.gymtracker.ui.theme.HumTheme
 import com.gymtracker.ui.theme.Neon
 import com.gymtracker.ui.theme.SubText
 import com.gymtracker.ui.theme.Surface
@@ -35,6 +37,7 @@ sealed class NavScreen(val route: String, val label: String, val icon: ImageVect
     object Home    : NavScreen("home",    "Log",     Icons.Default.FitnessCenter)
     object History : NavScreen("history", "History", Icons.Default.History)
     object Manage  : NavScreen("manage",  "Manage",  Icons.Default.Tune)
+    object Profile : NavScreen("profile", "Profile", Icons.Default.Person)
     object Settings: NavScreen("settings","Settings",Icons.Default.Settings)
 }
 
@@ -42,6 +45,7 @@ val BOTTOM_NAV_ITEMS = listOf(
     NavScreen.Home,
     NavScreen.History,
     NavScreen.Manage,
+    NavScreen.Profile,
     NavScreen.Settings
 )
 
@@ -52,8 +56,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            GymTrackerTheme {
-                GymTrackerApp(viewModel)
+            HumTheme {
+                HumApp(viewModel)
             }
         }
     }
@@ -61,8 +65,8 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GymTrackerApp(viewModel: MainViewModel) {
-    val navController = rememberNavController()
+fun HumApp(viewModel: MainViewModel) {
+    val currentProfile by viewModel.currentProfile.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Collect one-shot events
@@ -75,66 +79,94 @@ fun GymTrackerApp(viewModel: MainViewModel) {
         }
     }
 
-    Scaffold(
-        containerColor = Surface,
-        snackbarHost = {
-            SnackbarHost(snackbarHostState) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.startsWith("⚠️")) Color(0xFF3A1A1A) else Color(0xFF1A2A00),
-                    contentColor = if (data.visuals.message.startsWith("⚠️")) Color(0xFFFF6B6B) else Neon,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
-                )
-            }
-        },
-        bottomBar = {
-            val navBackStackEntry by navController.currentBackStackEntryAsState()
-            val currentRoute = navBackStackEntry?.destination?.route
-
-            NavigationBar(containerColor = Color(0xFF0A0A0A), tonalElevation = 0.dp) {
-                BOTTOM_NAV_ITEMS.forEach { screen ->
-                    val selected = currentRoute == screen.route
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(NavScreen.Home.route) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                screen.icon,
-                                contentDescription = screen.label,
-                                tint = if (selected) Neon else SubText
-                            )
-                        },
-                        label = {
-                            Text(
-                                screen.label,
-                                color = if (selected) Neon else SubText,
-                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = Color(0xFF1A2A00)
-                        )
+    if (currentProfile == null) {
+        // Login gate — no scaffold/nav bar
+        Scaffold(
+            containerColor = Surface,
+            snackbarHost = {
+                SnackbarHost(snackbarHostState) { data ->
+                    Snackbar(
+                        snackbarData = data,
+                        containerColor = if (data.visuals.message.startsWith("⚠️")) Color(0xFF3A1A1A) else Color(0xFF1A2A00),
+                        contentColor = if (data.visuals.message.startsWith("⚠️")) Color(0xFFFF6B6B) else Neon,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
                     )
                 }
             }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                ProfileLoginScreen(viewModel)
+            }
         }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            NavHost(navController = navController, startDestination = NavScreen.Home.route) {
-                composable(NavScreen.Home.route)     { HomeScreen(viewModel) }
-                composable(NavScreen.History.route)  { HistoryScreen(viewModel) }
-                composable(NavScreen.Manage.route)   { ManageScreen(viewModel) }
-                composable(NavScreen.Settings.route) { SettingsScreen(viewModel) }
+    } else {
+        val navController = rememberNavController()
+
+        Scaffold(
+            containerColor = Surface,
+            snackbarHost = {
+                SnackbarHost(snackbarHostState) { data ->
+                    Snackbar(
+                        snackbarData = data,
+                        containerColor = if (data.visuals.message.startsWith("⚠️")) Color(0xFF3A1A1A) else Color(0xFF1A2A00),
+                        contentColor = if (data.visuals.message.startsWith("⚠️")) Color(0xFFFF6B6B) else Neon,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                    )
+                }
+            },
+            bottomBar = {
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
+
+                NavigationBar(containerColor = Color(0xFF0A0A0A), tonalElevation = 0.dp) {
+                    BOTTOM_NAV_ITEMS.forEach { screen ->
+                        val selected = currentRoute == screen.route
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                navController.navigate(screen.route) {
+                                    popUpTo(NavScreen.Home.route) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            icon = {
+                                Icon(
+                                    screen.icon,
+                                    contentDescription = screen.label,
+                                    tint = if (selected) Neon else SubText
+                                )
+                            },
+                            label = {
+                                Text(
+                                    screen.label,
+                                    color = if (selected) Neon else SubText,
+                                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = Color(0xFF1A2A00)
+                            )
+                        )
+                    }
+                }
+            }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                NavHost(navController = navController, startDestination = NavScreen.Home.route) {
+                    composable(NavScreen.Home.route)     { HomeScreen(viewModel) }
+                    composable(NavScreen.History.route)  { HistoryScreen(viewModel) }
+                    composable(NavScreen.Manage.route)   { ManageScreen(viewModel) }
+                    composable(NavScreen.Profile.route)  { ProfileTabScreen(viewModel) }
+                    composable(NavScreen.Settings.route) { SettingsScreen(viewModel) }
+                }
             }
         }
     }

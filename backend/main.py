@@ -6,7 +6,7 @@ import sqlite3
 import os
 from datetime import datetime
 
-app = FastAPI(title="GymTracker API", version="1.0.0")
+app = FastAPI(title="Hum API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,6 +35,33 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
             category TEXT NOT NULL DEFAULT 'Other'
+        );
+
+        CREATE TABLE IF NOT EXISTS profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            starting_weight REAL,
+            current_weight REAL,
+            goal_weight REAL,
+            starting_waist REAL,
+            starting_arm REAL,
+            starting_chest REAL,
+            starting_thigh REAL,
+            starting_neck REAL,
+            starting_hip REAL,
+            current_waist REAL,
+            current_arm REAL,
+            current_chest REAL,
+            current_thigh REAL,
+            current_neck REAL,
+            current_hip REAL,
+            goal_waist REAL,
+            goal_arm REAL,
+            goal_chest REAL,
+            goal_thigh REAL,
+            goal_neck REAL,
+            goal_hip REAL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS workouts (
@@ -82,6 +109,18 @@ def init_db():
             ('Hip');
     """)
     conn.commit()
+
+    # Migrations: add profile_id to existing tables without breaking data
+    for sql in [
+        "ALTER TABLE workouts ADD COLUMN profile_id INTEGER REFERENCES profiles(id)",
+        "ALTER TABLE user_metrics ADD COLUMN profile_id INTEGER REFERENCES profiles(id)",
+    ]:
+        try:
+            conn.execute(sql)
+            conn.commit()
+        except Exception:
+            pass
+
     conn.close()
 
 
@@ -102,15 +141,129 @@ class WorkoutCreate(BaseModel):
     weight: float
     tempo: str = ""
     timestamp: Optional[str] = None
+    profile_id: Optional[int] = None
 
 class MetricCreate(BaseModel):
     metric_type: str
     value: float
     notes: str = ""
     timestamp: Optional[str] = None
+    profile_id: Optional[int] = None
 
 class MeasurementTypeCreate(BaseModel):
     name: str
+
+class ProfileCreate(BaseModel):
+    name: str
+    starting_weight: Optional[float] = None
+    current_weight: Optional[float] = None
+    goal_weight: Optional[float] = None
+    starting_waist: Optional[float] = None
+    starting_arm: Optional[float] = None
+    starting_chest: Optional[float] = None
+    starting_thigh: Optional[float] = None
+    starting_neck: Optional[float] = None
+    starting_hip: Optional[float] = None
+    current_waist: Optional[float] = None
+    current_arm: Optional[float] = None
+    current_chest: Optional[float] = None
+    current_thigh: Optional[float] = None
+    current_neck: Optional[float] = None
+    current_hip: Optional[float] = None
+    goal_waist: Optional[float] = None
+    goal_arm: Optional[float] = None
+    goal_chest: Optional[float] = None
+    goal_thigh: Optional[float] = None
+    goal_neck: Optional[float] = None
+    goal_hip: Optional[float] = None
+
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    starting_weight: Optional[float] = None
+    current_weight: Optional[float] = None
+    goal_weight: Optional[float] = None
+    starting_waist: Optional[float] = None
+    starting_arm: Optional[float] = None
+    starting_chest: Optional[float] = None
+    starting_thigh: Optional[float] = None
+    starting_neck: Optional[float] = None
+    starting_hip: Optional[float] = None
+    current_waist: Optional[float] = None
+    current_arm: Optional[float] = None
+    current_chest: Optional[float] = None
+    current_thigh: Optional[float] = None
+    current_neck: Optional[float] = None
+    current_hip: Optional[float] = None
+    goal_waist: Optional[float] = None
+    goal_arm: Optional[float] = None
+    goal_chest: Optional[float] = None
+    goal_thigh: Optional[float] = None
+    goal_neck: Optional[float] = None
+    goal_hip: Optional[float] = None
+
+
+# ── Profiles ──────────────────────────────────────────────────────────────────
+
+@app.get("/profiles", response_model=List[dict])
+def list_profiles(db: sqlite3.Connection = Depends(get_db)):
+    rows = db.execute("SELECT * FROM profiles ORDER BY name").fetchall()
+    return [dict(r) for r in rows]
+
+@app.post("/profiles", status_code=201)
+def create_profile(body: ProfileCreate, db: sqlite3.Connection = Depends(get_db)):
+    try:
+        cur = db.execute(
+            """INSERT INTO profiles (
+                name, starting_weight, current_weight, goal_weight,
+                starting_waist, starting_arm, starting_chest, starting_thigh, starting_neck, starting_hip,
+                current_waist, current_arm, current_chest, current_thigh, current_neck, current_hip,
+                goal_waist, goal_arm, goal_chest, goal_thigh, goal_neck, goal_hip
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                body.name, body.starting_weight, body.current_weight, body.goal_weight,
+                body.starting_waist, body.starting_arm, body.starting_chest, body.starting_thigh, body.starting_neck, body.starting_hip,
+                body.current_waist, body.current_arm, body.current_chest, body.current_thigh, body.current_neck, body.current_hip,
+                body.goal_waist, body.goal_arm, body.goal_chest, body.goal_thigh, body.goal_neck, body.goal_hip,
+            )
+        )
+        db.commit()
+        profile = db.execute("SELECT * FROM profiles WHERE id=?", (cur.lastrowid,)).fetchone()
+        return dict(profile)
+    except sqlite3.IntegrityError:
+        raise HTTPException(400, "Profile name already exists")
+
+@app.get("/profiles/{profile_id}", response_model=dict)
+def get_profile(profile_id: int, db: sqlite3.Connection = Depends(get_db)):
+    row = db.execute("SELECT * FROM profiles WHERE id=?", (profile_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "Profile not found")
+    return dict(row)
+
+@app.put("/profiles/{profile_id}")
+def update_profile(profile_id: int, body: ProfileUpdate, db: sqlite3.Connection = Depends(get_db)):
+    row = db.execute("SELECT * FROM profiles WHERE id=?", (profile_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "Profile not found")
+    current = dict(row)
+    fields = [
+        "name", "starting_weight", "current_weight", "goal_weight",
+        "starting_waist", "starting_arm", "starting_chest", "starting_thigh", "starting_neck", "starting_hip",
+        "current_waist", "current_arm", "current_chest", "current_thigh", "current_neck", "current_hip",
+        "goal_waist", "goal_arm", "goal_chest", "goal_thigh", "goal_neck", "goal_hip",
+    ]
+    updates = {f: getattr(body, f) if getattr(body, f) is not None else current[f] for f in fields}
+    db.execute(
+        f"UPDATE profiles SET {', '.join(f + '=?' for f in fields)} WHERE id=?",
+        [*updates.values(), profile_id]
+    )
+    db.commit()
+    updated = db.execute("SELECT * FROM profiles WHERE id=?", (profile_id,)).fetchone()
+    return dict(updated)
+
+@app.delete("/profiles/{profile_id}", status_code=204)
+def delete_profile(profile_id: int, db: sqlite3.Connection = Depends(get_db)):
+    db.execute("DELETE FROM profiles WHERE id=?", (profile_id,))
+    db.commit()
 
 
 # ── Exercises ─────────────────────────────────────────────────────────────────
@@ -174,18 +327,24 @@ def delete_measurement_type(type_id: int, db: sqlite3.Connection = Depends(get_d
 # ── Workouts ──────────────────────────────────────────────────────────────────
 
 @app.get("/workouts", response_model=List[dict])
-def list_workouts(limit: int = 50, db: sqlite3.Connection = Depends(get_db)):
-    rows = db.execute(
-        "SELECT * FROM workouts ORDER BY timestamp DESC LIMIT ?", (limit,)
-    ).fetchall()
+def list_workouts(limit: int = 50, profile_id: Optional[int] = None, db: sqlite3.Connection = Depends(get_db)):
+    if profile_id is not None:
+        rows = db.execute(
+            "SELECT * FROM workouts WHERE profile_id=? ORDER BY timestamp DESC LIMIT ?",
+            (profile_id, limit)
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT * FROM workouts ORDER BY timestamp DESC LIMIT ?", (limit,)
+        ).fetchall()
     return [dict(r) for r in rows]
 
 @app.post("/workouts", status_code=201)
 def log_workout(body: WorkoutCreate, db: sqlite3.Connection = Depends(get_db)):
     ts = body.timestamp or datetime.utcnow().isoformat()
     cur = db.execute(
-        "INSERT INTO workouts (timestamp, exercise_name, sets, reps, weight, tempo) VALUES (?,?,?,?,?,?)",
-        (ts, body.exercise_name, body.sets, body.reps, body.weight, body.tempo)
+        "INSERT INTO workouts (timestamp, exercise_name, sets, reps, weight, tempo, profile_id) VALUES (?,?,?,?,?,?,?)",
+        (ts, body.exercise_name, body.sets, body.reps, body.weight, body.tempo, body.profile_id)
     )
     db.commit()
     return {"id": cur.lastrowid, "timestamp": ts}
@@ -199,11 +358,21 @@ def delete_workout(workout_id: int, db: sqlite3.Connection = Depends(get_db)):
 # ── Metrics ───────────────────────────────────────────────────────────────────
 
 @app.get("/metrics", response_model=List[dict])
-def list_metrics(limit: int = 100, metric_type: Optional[str] = None, db: sqlite3.Connection = Depends(get_db)):
-    if metric_type:
+def list_metrics(limit: int = 100, metric_type: Optional[str] = None, profile_id: Optional[int] = None, db: sqlite3.Connection = Depends(get_db)):
+    if metric_type and profile_id is not None:
+        rows = db.execute(
+            "SELECT * FROM user_metrics WHERE metric_type=? AND profile_id=? ORDER BY timestamp DESC LIMIT ?",
+            (metric_type, profile_id, limit)
+        ).fetchall()
+    elif metric_type:
         rows = db.execute(
             "SELECT * FROM user_metrics WHERE metric_type=? ORDER BY timestamp DESC LIMIT ?",
             (metric_type, limit)
+        ).fetchall()
+    elif profile_id is not None:
+        rows = db.execute(
+            "SELECT * FROM user_metrics WHERE profile_id=? ORDER BY timestamp DESC LIMIT ?",
+            (profile_id, limit)
         ).fetchall()
     else:
         rows = db.execute(
@@ -215,8 +384,8 @@ def list_metrics(limit: int = 100, metric_type: Optional[str] = None, db: sqlite
 def log_metric(body: MetricCreate, db: sqlite3.Connection = Depends(get_db)):
     ts = body.timestamp or datetime.utcnow().isoformat()
     cur = db.execute(
-        "INSERT INTO user_metrics (timestamp, metric_type, value, notes) VALUES (?,?,?,?)",
-        (ts, body.metric_type, body.value, body.notes)
+        "INSERT INTO user_metrics (timestamp, metric_type, value, notes, profile_id) VALUES (?,?,?,?,?)",
+        (ts, body.metric_type, body.value, body.notes, body.profile_id)
     )
     db.commit()
     return {"id": cur.lastrowid, "timestamp": ts}

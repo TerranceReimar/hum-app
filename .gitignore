@@ -38,6 +38,12 @@ android/captures/
 # Local config (contains machine-specific SDK paths)
 android/local.properties
 
+# Gradle daemon — machine-specific JVM toolchain URLs, regenerated automatically
+android/gradle/gradle-daemon-jvm.properties
+
+# JVM heap dumps — crash artifacts, never commit
+*.hprof
+
 # IntelliJ / Android Studio
 *.iml
 .idea/
@@ -53,7 +59,6 @@ release/
 android/app/src/main/assets/
 CLAUDE.md
 .claude
-.idea
 
 # ─── macOS ────────────────────────────────────────────────────────────────────
 .DS_Store

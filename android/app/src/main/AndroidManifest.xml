@@ -6,8 +6,10 @@
 
     <application
         android:allowBackup="true"
-        android:label="GymTracker"
-        android:theme="@style/Theme.GymTracker"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="Hum"
+        android:theme="@style/Theme.Hum"
         android:usesCleartextTraffic="true">
 
         <!-- usesCleartextTraffic allows HTTP to local Pi IP; for production use HTTPS -->

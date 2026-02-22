@@ -32,6 +32,77 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun emit(event: UiEvent) = _events.emit(event)
 
+    // ── Profiles ──────────────────────────────────────────────────────────────
+    private val _profiles = MutableStateFlow<List<Profile>>(emptyList())
+    val profiles: StateFlow<List<Profile>> = _profiles
+
+    private val _currentProfile = MutableStateFlow<Profile?>(null)
+    val currentProfile: StateFlow<Profile?> = _currentProfile
+
+    private val _isLoadingProfile = MutableStateFlow(false)
+    val isLoadingProfile: StateFlow<Boolean> = _isLoadingProfile
+
+    fun loadProfiles() = viewModelScope.launch {
+        runCatching { RetrofitClient.service.getProfiles() }
+            .onSuccess { resp -> if (resp.isSuccessful) _profiles.value = resp.body() ?: emptyList() }
+            .onFailure { /* silently ignore — shown via login screen state */ }
+    }
+
+    fun selectProfile(id: Int) = viewModelScope.launch {
+        _isLoadingProfile.value = true
+        runCatching { RetrofitClient.service.getProfile(id) }
+            .onSuccess { resp ->
+                if (resp.isSuccessful) {
+                    val profile = resp.body()
+                    _currentProfile.value = profile
+                    settings.saveProfileId(profile?.id)
+                    loadWorkouts()
+                    loadMetrics()
+                } else {
+                    emit(UiEvent.Error("Failed to load profile: ${resp.code()}"))
+                }
+            }
+            .onFailure { emit(UiEvent.Error("Network error: ${it.message}")) }
+        _isLoadingProfile.value = false
+    }
+
+    fun signOut() = viewModelScope.launch {
+        settings.saveProfileId(null)
+        _currentProfile.value = null
+        _workouts.value = emptyList()
+        _metrics.value = emptyList()
+    }
+
+    fun createProfile(name: String) = viewModelScope.launch {
+        runCatching { RetrofitClient.service.createProfile(ProfileCreate(name)) }
+            .onSuccess { resp ->
+                if (resp.isSuccessful) {
+                    val profile = resp.body()
+                    if (profile != null) {
+                        loadProfiles()
+                        selectProfile(profile.id)
+                    }
+                } else {
+                    emit(UiEvent.Error("Failed to create profile: ${resp.code()}"))
+                }
+            }
+            .onFailure { emit(UiEvent.Error("Network error: ${it.message}")) }
+    }
+
+    fun updateCurrentProfile(update: ProfileUpdate) = viewModelScope.launch {
+        val profileId = _currentProfile.value?.id ?: return@launch
+        runCatching { RetrofitClient.service.updateProfile(profileId, update) }
+            .onSuccess { resp ->
+                if (resp.isSuccessful) {
+                    _currentProfile.value = resp.body()
+                    emit(UiEvent.Success("Profile updated"))
+                } else {
+                    emit(UiEvent.Error("Failed to update: ${resp.code()}"))
+                }
+            }
+            .onFailure { emit(UiEvent.Error("Network error: ${it.message}")) }
+    }
+
     // ── Exercises ─────────────────────────────────────────────────────────────
     private val _exercises = MutableStateFlow<List<Exercise>>(emptyList())
     val exercises: StateFlow<List<Exercise>> = _exercises
@@ -98,14 +169,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val workouts: StateFlow<List<Workout>> = _workouts
 
     fun loadWorkouts() = viewModelScope.launch {
-        runCatching { RetrofitClient.service.getWorkouts() }
+        val profileId = _currentProfile.value?.id
+        runCatching { RetrofitClient.service.getWorkouts(profileId) }
             .onSuccess { resp -> if (resp.isSuccessful) _workouts.value = resp.body() ?: emptyList() }
             .onFailure { emit(UiEvent.Error("Failed to load workouts")) }
     }
 
     fun logWorkout(exerciseName: String, sets: Int, reps: Int, weight: Float, tempo: String) = viewModelScope.launch {
+        val profileId = _currentProfile.value?.id
         runCatching {
-            RetrofitClient.service.logWorkout(WorkoutCreate(exerciseName, sets, reps, weight, tempo))
+            RetrofitClient.service.logWorkout(WorkoutCreate(exerciseName, sets, reps, weight, tempo, profileId))
         }.onSuccess { resp ->
             if (resp.isSuccessful) {
                 emit(UiEvent.Success("✅ Workout logged to Pi!"))
@@ -125,14 +198,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val metrics: StateFlow<List<UserMetric>> = _metrics
 
     fun loadMetrics() = viewModelScope.launch {
-        runCatching { RetrofitClient.service.getMetrics() }
+        val profileId = _currentProfile.value?.id
+        runCatching { RetrofitClient.service.getMetrics(profileId) }
             .onSuccess { resp -> if (resp.isSuccessful) _metrics.value = resp.body() ?: emptyList() }
             .onFailure { emit(UiEvent.Error("Failed to load metrics")) }
     }
 
     fun logMetric(metricType: String, value: Float, notes: String) = viewModelScope.launch {
+        val profileId = _currentProfile.value?.id
         runCatching {
-            RetrofitClient.service.logMetric(MetricCreate(metricType, value, notes))
+            RetrofitClient.service.logMetric(MetricCreate(metricType, value, notes, profileId))
         }.onSuccess { resp ->
             if (resp.isSuccessful) {
                 emit(UiEvent.Success("✅ Metrics synced to Pi!"))
@@ -149,14 +224,35 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── Init ──────────────────────────────────────────────────────────────────
     init {
+        // Keep RetrofitClient base URL in sync with DataStore
         viewModelScope.launch {
             settings.baseUrl.collect { url ->
                 RetrofitClient.setBaseUrl(url)
             }
         }
+        // Restore saved profile on startup
+        viewModelScope.launch {
+            settings.profileIdFlow.collect { savedId ->
+                if (savedId != null && _currentProfile.value == null) {
+                    _isLoadingProfile.value = true
+                    runCatching { RetrofitClient.service.getProfile(savedId) }
+                        .onSuccess { resp ->
+                            if (resp.isSuccessful) {
+                                _currentProfile.value = resp.body()
+                                loadWorkouts()
+                                loadMetrics()
+                            } else {
+                                // Saved profile no longer exists — clear it
+                                settings.saveProfileId(null)
+                            }
+                        }
+                        .onFailure { /* server unreachable — stay on login screen */ }
+                    _isLoadingProfile.value = false
+                }
+            }
+        }
         loadExercises()
         loadMeasurementTypes()
-        loadWorkouts()
-        loadMetrics()
+        loadProfiles()
     }
 }

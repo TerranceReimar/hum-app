@@ -50,7 +50,7 @@ fun HomeScreen(viewModel: MainViewModel) {
         ) {
             // Header
             Text(
-                text = "GYM TRACKER",
+                text = "HUM",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Black,
                 color = Neon,
