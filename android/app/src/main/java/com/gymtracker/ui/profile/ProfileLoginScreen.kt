@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,6 +24,7 @@ import com.gymtracker.data.models.Profile
 import com.gymtracker.ui.MainViewModel
 import com.gymtracker.ui.theme.*
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.text.KeyboardOptions
 
 @Composable
 fun ProfileLoginScreen(viewModel: MainViewModel) {
@@ -31,7 +34,12 @@ fun ProfileLoginScreen(viewModel: MainViewModel) {
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var newProfileName by remember { mutableStateOf("") }
+    var newProfilePassword by remember { mutableStateOf("") }
+    var newProfilePasswordConfirm by remember { mutableStateOf("") }
     var showServerDialog by remember { mutableStateOf(false) }
+
+    var pendingProfile by remember { mutableStateOf<Profile?>(null) }
+    var showPasswordEntryDialog by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -102,7 +110,6 @@ fun ProfileLoginScreen(viewModel: MainViewModel) {
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                     Spacer(Modifier.height(16.dp))
-                    // Show current URL so user knows what's configured
                     Text(
                         currentUrl,
                         color = SubText,
@@ -116,7 +123,17 @@ fun ProfileLoginScreen(viewModel: MainViewModel) {
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(profiles) { profile ->
-                        ProfileCard(profile = profile, onClick = { viewModel.selectProfile(profile.id) })
+                        ProfileCard(
+                            profile = profile,
+                            onClick = {
+                                if (profile.hasPassword) {
+                                    pendingProfile = profile
+                                    showPasswordEntryDialog = true
+                                } else {
+                                    viewModel.selectProfile(profile.id)
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -148,42 +165,120 @@ fun ProfileLoginScreen(viewModel: MainViewModel) {
 
     // Create profile dialog
     if (showCreateDialog) {
+        val passwordMismatch = newProfilePasswordConfirm.isNotEmpty() &&
+                newProfilePassword != newProfilePasswordConfirm
+
         AlertDialog(
-            onDismissRequest = { showCreateDialog = false; newProfileName = "" },
+            onDismissRequest = {
+                showCreateDialog = false
+                newProfileName = ""
+                newProfilePassword = ""
+                newProfilePasswordConfirm = ""
+            },
             containerColor = Card,
             title = { Text("New Profile", color = OnSurface, fontWeight = FontWeight.Bold) },
             text = {
-                OutlinedTextField(
-                    value = newProfileName,
-                    onValueChange = { newProfileName = it },
-                    label = { Text("Profile name", color = SubText) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Neon,
-                        unfocusedBorderColor = SubText,
-                        focusedTextColor = OnSurface,
-                        unfocusedTextColor = OnSurface,
-                        cursorColor = Neon
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = newProfileName,
+                        onValueChange = { newProfileName = it },
+                        label = { Text("Profile name", color = SubText) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Neon,
+                            unfocusedBorderColor = SubText,
+                            focusedTextColor = OnSurface,
+                            unfocusedTextColor = OnSurface,
+                            cursorColor = Neon
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newProfilePassword,
+                        onValueChange = { newProfilePassword = it },
+                        label = { Text("Password", color = SubText) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Neon,
+                            unfocusedBorderColor = SubText,
+                            focusedTextColor = OnSurface,
+                            unfocusedTextColor = OnSurface,
+                            cursorColor = Neon
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newProfilePasswordConfirm,
+                        onValueChange = { newProfilePasswordConfirm = it },
+                        label = { Text("Confirm password", color = SubText) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        isError = passwordMismatch,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = if (passwordMismatch) ErrorRed else Neon,
+                            unfocusedBorderColor = if (passwordMismatch) ErrorRed else SubText,
+                            focusedTextColor = OnSurface,
+                            unfocusedTextColor = OnSurface,
+                            cursorColor = Neon
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (passwordMismatch) {
+                        Text("Passwords do not match", color = ErrorRed, fontSize = 12.sp)
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (newProfileName.isNotBlank()) {
-                            viewModel.createProfile(newProfileName.trim())
+                        if (newProfileName.isNotBlank() && newProfilePassword.isNotBlank() &&
+                            newProfilePassword == newProfilePasswordConfirm
+                        ) {
+                            viewModel.createProfile(newProfileName.trim(), newProfilePassword)
                             showCreateDialog = false
                             newProfileName = ""
+                            newProfilePassword = ""
+                            newProfilePasswordConfirm = ""
                         }
-                    }
+                    },
+                    enabled = newProfileName.isNotBlank() && newProfilePassword.isNotBlank() &&
+                            newProfilePassword == newProfilePasswordConfirm
                 ) {
                     Text("Create", color = Neon, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCreateDialog = false; newProfileName = "" }) {
+                TextButton(onClick = {
+                    showCreateDialog = false
+                    newProfileName = ""
+                    newProfilePassword = ""
+                    newProfilePasswordConfirm = ""
+                }) {
                     Text("Cancel", color = SubText)
+                }
+            }
+        )
+    }
+
+    // Password entry dialog (for existing profiles)
+    if (showPasswordEntryDialog && pendingProfile != null) {
+        PasswordEntryDialog(
+            profileName = pendingProfile!!.name,
+            onDismiss = {
+                showPasswordEntryDialog = false
+                pendingProfile = null
+            },
+            onVerify = { password, onResult ->
+                viewModel.verifyProfilePassword(pendingProfile!!.id, password) { valid ->
+                    onResult(valid)
+                    if (valid) {
+                        viewModel.selectProfile(pendingProfile!!.id)
+                        showPasswordEntryDialog = false
+                        pendingProfile = null
+                    }
                 }
             }
         )
@@ -201,6 +296,77 @@ fun ProfileLoginScreen(viewModel: MainViewModel) {
             }
         )
     }
+}
+
+@Composable
+private fun PasswordEntryDialog(
+    profileName: String,
+    onDismiss: () -> Unit,
+    onVerify: (password: String, onResult: (Boolean) -> Unit) -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    var isVerifying by remember { mutableStateOf(false) }
+    var showError by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Card,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Lock, null, tint = Neon, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(profileName, color = OnSurface, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it; showError = false },
+                    label = { Text("Password", color = SubText) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    isError = showError,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = if (showError) ErrorRed else Neon,
+                        unfocusedBorderColor = if (showError) ErrorRed else SubText,
+                        focusedTextColor = OnSurface,
+                        unfocusedTextColor = OnSurface,
+                        cursorColor = Neon
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (showError) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Incorrect password", color = ErrorRed, fontSize = 13.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    isVerifying = true
+                    showError = false
+                    onVerify(password) { valid ->
+                        isVerifying = false
+                        if (!valid) showError = true
+                    }
+                },
+                enabled = password.isNotBlank() && !isVerifying,
+                colors = ButtonDefaults.buttonColors(containerColor = Neon, contentColor = Color.Black)
+            ) {
+                if (isVerifying) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
+                } else {
+                    Text("Login", fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = SubText) }
+        }
+    )
 }
 
 @Composable
@@ -338,6 +504,10 @@ private fun ProfileCard(profile: Profile, onClick: () -> Unit) {
                 profile.currentWeight?.let {
                     Text("$it lbs", color = SubText, fontSize = 12.sp)
                 }
+            }
+            if (profile.hasPassword) {
+                Icon(Icons.Default.Lock, contentDescription = "Password protected", tint = SubText, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
             }
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SubText)
         }

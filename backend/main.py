@@ -114,6 +114,7 @@ def init_db():
     for sql in [
         "ALTER TABLE workouts ADD COLUMN profile_id INTEGER REFERENCES profiles(id)",
         "ALTER TABLE user_metrics ADD COLUMN profile_id INTEGER REFERENCES profiles(id)",
+        "ALTER TABLE profiles ADD COLUMN password TEXT NOT NULL DEFAULT ''",
     ]:
         try:
             conn.execute(sql)
@@ -155,6 +156,7 @@ class MeasurementTypeCreate(BaseModel):
 
 class ProfileCreate(BaseModel):
     name: str
+    password: str
     starting_weight: Optional[float] = None
     current_weight: Optional[float] = None
     goal_weight: Optional[float] = None
@@ -177,8 +179,12 @@ class ProfileCreate(BaseModel):
     goal_neck: Optional[float] = None
     goal_hip: Optional[float] = None
 
+class PasswordVerify(BaseModel):
+    password: str
+
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
+    password: Optional[str] = None
     starting_weight: Optional[float] = None
     current_weight: Optional[float] = None
     goal_weight: Optional[float] = None
@@ -204,23 +210,31 @@ class ProfileUpdate(BaseModel):
 
 # ── Profiles ──────────────────────────────────────────────────────────────────
 
+def profile_to_dict(row) -> dict:
+    """Convert a profile row to a dict, replacing the raw password with has_password."""
+    d = dict(row)
+    password = d.pop("password", "")
+    d["has_password"] = bool(password)
+    return d
+
+
 @app.get("/profiles", response_model=List[dict])
 def list_profiles(db: sqlite3.Connection = Depends(get_db)):
     rows = db.execute("SELECT * FROM profiles ORDER BY name").fetchall()
-    return [dict(r) for r in rows]
+    return [profile_to_dict(r) for r in rows]
 
 @app.post("/profiles", status_code=201)
 def create_profile(body: ProfileCreate, db: sqlite3.Connection = Depends(get_db)):
     try:
         cur = db.execute(
             """INSERT INTO profiles (
-                name, starting_weight, current_weight, goal_weight,
+                name, password, starting_weight, current_weight, goal_weight,
                 starting_waist, starting_arm, starting_chest, starting_thigh, starting_neck, starting_hip,
                 current_waist, current_arm, current_chest, current_thigh, current_neck, current_hip,
                 goal_waist, goal_arm, goal_chest, goal_thigh, goal_neck, goal_hip
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                body.name, body.starting_weight, body.current_weight, body.goal_weight,
+                body.name, body.password, body.starting_weight, body.current_weight, body.goal_weight,
                 body.starting_waist, body.starting_arm, body.starting_chest, body.starting_thigh, body.starting_neck, body.starting_hip,
                 body.current_waist, body.current_arm, body.current_chest, body.current_thigh, body.current_neck, body.current_hip,
                 body.goal_waist, body.goal_arm, body.goal_chest, body.goal_thigh, body.goal_neck, body.goal_hip,
@@ -228,7 +242,7 @@ def create_profile(body: ProfileCreate, db: sqlite3.Connection = Depends(get_db)
         )
         db.commit()
         profile = db.execute("SELECT * FROM profiles WHERE id=?", (cur.lastrowid,)).fetchone()
-        return dict(profile)
+        return profile_to_dict(profile)
     except sqlite3.IntegrityError:
         raise HTTPException(400, "Profile name already exists")
 
@@ -237,7 +251,14 @@ def get_profile(profile_id: int, db: sqlite3.Connection = Depends(get_db)):
     row = db.execute("SELECT * FROM profiles WHERE id=?", (profile_id,)).fetchone()
     if not row:
         raise HTTPException(404, "Profile not found")
-    return dict(row)
+    return profile_to_dict(row)
+
+@app.post("/profiles/{profile_id}/verify-password")
+def verify_password(profile_id: int, body: PasswordVerify, db: sqlite3.Connection = Depends(get_db)):
+    row = db.execute("SELECT password FROM profiles WHERE id=?", (profile_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "Profile not found")
+    return {"valid": row["password"] == body.password}
 
 @app.put("/profiles/{profile_id}")
 def update_profile(profile_id: int, body: ProfileUpdate, db: sqlite3.Connection = Depends(get_db)):
@@ -246,7 +267,7 @@ def update_profile(profile_id: int, body: ProfileUpdate, db: sqlite3.Connection 
         raise HTTPException(404, "Profile not found")
     current = dict(row)
     fields = [
-        "name", "starting_weight", "current_weight", "goal_weight",
+        "name", "password", "starting_weight", "current_weight", "goal_weight",
         "starting_waist", "starting_arm", "starting_chest", "starting_thigh", "starting_neck", "starting_hip",
         "current_waist", "current_arm", "current_chest", "current_thigh", "current_neck", "current_hip",
         "goal_waist", "goal_arm", "goal_chest", "goal_thigh", "goal_neck", "goal_hip",
@@ -258,7 +279,7 @@ def update_profile(profile_id: int, body: ProfileUpdate, db: sqlite3.Connection 
     )
     db.commit()
     updated = db.execute("SELECT * FROM profiles WHERE id=?", (profile_id,)).fetchone()
-    return dict(updated)
+    return profile_to_dict(updated)
 
 @app.delete("/profiles/{profile_id}", status_code=204)
 def delete_profile(profile_id: int, db: sqlite3.Connection = Depends(get_db)):

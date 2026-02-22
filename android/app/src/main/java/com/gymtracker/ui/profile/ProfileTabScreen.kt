@@ -1,8 +1,17 @@
 package com.gymtracker.ui.profile
 
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -12,9 +21,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gymtracker.data.models.Profile
@@ -25,10 +39,35 @@ import com.gymtracker.ui.theme.*
 @Composable
 fun ProfileTabScreen(viewModel: MainViewModel) {
     val profile by viewModel.currentProfile.collectAsState()
+    val photoUri by viewModel.profilePhotoUri.collectAsState()
+    val context = LocalContext.current
 
     var showWeightDialog by remember { mutableStateOf(false) }
     var showCurrentDimsDialog by remember { mutableStateOf(false) }
     var showGoalDimsDialog by remember { mutableStateOf(false) }
+    var showNameDialog by remember { mutableStateOf(false) }
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { /* URI not persistable — still usable this session */ }
+            viewModel.saveProfilePhotoUri(uri.toString())
+        }
+    }
+
+    val bitmap = remember(photoUri) {
+        if (photoUri == null) null
+        else runCatching {
+            BitmapFactory.decodeStream(context.contentResolver.openInputStream(Uri.parse(photoUri)))
+        }.getOrNull()
+    }
 
     Column(
         modifier = Modifier
@@ -37,11 +76,56 @@ fun ProfileTabScreen(viewModel: MainViewModel) {
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
-        // Header
+        // Header with photo + name
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Person, contentDescription = null, tint = Neon, modifier = Modifier.size(28.dp))
-            Spacer(Modifier.width(10.dp))
-            Column {
+            // Circular profile photo — tap to change
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(Card)
+                    .clickable {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Profile photo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        tint = Neon,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+                // Camera badge
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(22.dp)
+                        .background(Neon, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.CameraAlt,
+                        contentDescription = "Change photo",
+                        tint = Color.Black,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     profile?.name ?: "",
                     fontSize = 22.sp,
@@ -50,6 +134,15 @@ fun ProfileTabScreen(viewModel: MainViewModel) {
                     letterSpacing = 1.sp
                 )
                 Text("Profile", color = SubText, fontSize = 12.sp, letterSpacing = 2.sp)
+            }
+
+            IconButton(onClick = { showNameDialog = true }) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Edit name",
+                    tint = SubText,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
 
@@ -97,6 +190,51 @@ fun ProfileTabScreen(viewModel: MainViewModel) {
             DimRow("Neck", profile?.goalNeck)
             DimRow("Hip", profile?.goalHip)
         }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Account Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Card),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showPasswordDialog = true }
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Lock, null, tint = Neon, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Change Password",
+                        color = OnSurface,
+                        fontSize = 15.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Default.ChevronRight, null, tint = SubText)
+                }
+
+                HorizontalDivider(color = Surface, thickness = 1.dp)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showDeleteConfirmDialog = true }
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.DeleteForever, null, tint = ErrorRed, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Delete Profile", color = ErrorRed, fontSize = 15.sp)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
     }
 
     // Weight edit dialog
@@ -153,6 +291,68 @@ fun ProfileTabScreen(viewModel: MainViewModel) {
                     )
                 )
                 showGoalDimsDialog = false
+            }
+        )
+    }
+
+    // Name edit dialog
+    if (showNameDialog && profile != null) {
+        NameEditDialog(
+            currentName = profile!!.name,
+            onDismiss = { showNameDialog = false },
+            onSave = { newName ->
+                viewModel.updateCurrentProfile(ProfileUpdate(name = newName))
+                showNameDialog = false
+            }
+        )
+    }
+
+    // Change password dialog
+    if (showPasswordDialog) {
+        ChangePasswordDialog(
+            onDismiss = { showPasswordDialog = false },
+            onSave = { newPassword ->
+                viewModel.changePassword(newPassword)
+                showPasswordDialog = false
+            }
+        )
+    }
+
+    // Delete profile confirmation dialog
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            containerColor = Card,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Warning, null, tint = ErrorRed, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Delete Profile", color = ErrorRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Text(
+                    "Are you sure you want to delete \"${profile?.name}\"? " +
+                            "All workout and metric data will be permanently deleted. This cannot be undone.",
+                    color = OnSurface,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteCurrentProfile()
+                        showDeleteConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("Cancel", color = SubText)
+                }
             }
         )
     }
@@ -307,6 +507,115 @@ private fun DimensionsEditDialog(
                     thighStr.toFloatOrNull(), neckStr.toFloatOrNull(), hipStr.toFloatOrNull()
                 )
             }) {
+                Text("Save", color = Neon, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = SubText) }
+        }
+    )
+}
+
+@Composable
+private fun NameEditDialog(
+    currentName: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Card,
+        title = { Text("Edit Name", color = OnSurface, fontWeight = FontWeight.Bold) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name", color = SubText) },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Neon,
+                    unfocusedBorderColor = SubText,
+                    focusedTextColor = OnSurface,
+                    unfocusedTextColor = OnSurface,
+                    cursorColor = Neon
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(name.trim()) },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Save", color = Neon, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = SubText) }
+        }
+    )
+}
+
+@Composable
+private fun ChangePasswordDialog(
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    val mismatch = confirmPassword.isNotEmpty() && newPassword != confirmPassword
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Card,
+        title = { Text("Change Password", color = OnSurface, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = newPassword,
+                    onValueChange = { newPassword = it },
+                    label = { Text("New password", color = SubText) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Neon,
+                        unfocusedBorderColor = SubText,
+                        focusedTextColor = OnSurface,
+                        unfocusedTextColor = OnSurface,
+                        cursorColor = Neon
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    label = { Text("Confirm password", color = SubText) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    isError = mismatch,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = if (mismatch) ErrorRed else Neon,
+                        unfocusedBorderColor = if (mismatch) ErrorRed else SubText,
+                        focusedTextColor = OnSurface,
+                        unfocusedTextColor = OnSurface,
+                        cursorColor = Neon
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (mismatch) {
+                    Text("Passwords do not match", color = ErrorRed, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(newPassword) },
+                enabled = newPassword.isNotBlank() && newPassword == confirmPassword
+            ) {
                 Text("Save", color = Neon, fontWeight = FontWeight.Bold)
             }
         },

@@ -42,6 +42,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _isLoadingProfile = MutableStateFlow(false)
     val isLoadingProfile: StateFlow<Boolean> = _isLoadingProfile
 
+    private val _profilePhotoUri = MutableStateFlow<String?>(null)
+    val profilePhotoUri: StateFlow<String?> = _profilePhotoUri
+
     fun loadProfiles() = viewModelScope.launch {
         runCatching { RetrofitClient.service.getProfiles() }
             .onSuccess { resp -> if (resp.isSuccessful) _profiles.value = resp.body() ?: emptyList() }
@@ -73,8 +76,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _metrics.value = emptyList()
     }
 
-    fun createProfile(name: String) = viewModelScope.launch {
-        runCatching { RetrofitClient.service.createProfile(ProfileCreate(name)) }
+    fun createProfile(name: String, password: String) = viewModelScope.launch {
+        runCatching { RetrofitClient.service.createProfile(ProfileCreate(name, password)) }
             .onSuccess { resp ->
                 if (resp.isSuccessful) {
                     val profile = resp.body()
@@ -85,6 +88,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     emit(UiEvent.Error("Failed to create profile: ${resp.code()}"))
                 }
+            }
+            .onFailure { emit(UiEvent.Error("Network error: ${it.message}")) }
+    }
+
+    fun verifyProfilePassword(profileId: Int, password: String, onResult: (Boolean) -> Unit) =
+        viewModelScope.launch {
+            runCatching { RetrofitClient.service.verifyPassword(profileId, PasswordVerifyRequest(password)) }
+                .onSuccess { resp -> onResult(resp.isSuccessful && resp.body()?.valid == true) }
+                .onFailure { onResult(false) }
+        }
+
+    fun deleteCurrentProfile() = viewModelScope.launch {
+        val profileId = _currentProfile.value?.id ?: return@launch
+        runCatching { RetrofitClient.service.deleteProfile(profileId) }
+            .onSuccess {
+                emit(UiEvent.Success("Profile deleted"))
+                signOut()
+                loadProfiles()
+            }
+            .onFailure { emit(UiEvent.Error("Failed to delete profile: ${it.message}")) }
+    }
+
+    fun saveProfilePhotoUri(uri: String?) = viewModelScope.launch {
+        val profileId = _currentProfile.value?.id ?: return@launch
+        settings.saveProfilePhotoUri(profileId, uri)
+        _profilePhotoUri.value = uri
+    }
+
+    fun changePassword(newPassword: String) = viewModelScope.launch {
+        val profileId = _currentProfile.value?.id ?: return@launch
+        runCatching { RetrofitClient.service.updateProfile(profileId, ProfileUpdate(password = newPassword)) }
+            .onSuccess { resp ->
+                if (resp.isSuccessful) emit(UiEvent.Success("Password changed"))
+                else emit(UiEvent.Error("Failed to change password: ${resp.code()}"))
             }
             .onFailure { emit(UiEvent.Error("Network error: ${it.message}")) }
     }
@@ -250,6 +287,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     _isLoadingProfile.value = false
                 }
             }
+        }
+        // Sync profile photo URI whenever selected profile changes
+        viewModelScope.launch {
+            currentProfile.flatMapLatest { profile ->
+                if (profile != null) settings.getProfilePhotoUri(profile.id)
+                else flowOf(null)
+            }.collect { _profilePhotoUri.value = it }
         }
         loadExercises()
         loadMeasurementTypes()
