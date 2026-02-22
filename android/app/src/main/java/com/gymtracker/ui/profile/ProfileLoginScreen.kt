@@ -126,12 +126,8 @@ fun ProfileLoginScreen(viewModel: MainViewModel) {
                         ProfileCard(
                             profile = profile,
                             onClick = {
-                                if (profile.hasPassword) {
-                                    pendingProfile = profile
-                                    showPasswordEntryDialog = true
-                                } else {
-                                    viewModel.selectProfile(profile.id)
-                                }
+                                pendingProfile = profile
+                                showPasswordEntryDialog = true
                             }
                         )
                     }

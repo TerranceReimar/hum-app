@@ -21,12 +21,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.gymtracker.ui.MainViewModel
 import com.gymtracker.ui.UiEvent
-import com.gymtracker.ui.history.HistoryScreen
-import com.gymtracker.ui.home.HomeScreen
-import com.gymtracker.ui.manage.ManageScreen
+import com.gymtracker.ui.dashboard.DashboardScreen
+import com.gymtracker.ui.more.MoreScreen
 import com.gymtracker.ui.profile.ProfileLoginScreen
-import com.gymtracker.ui.profile.ProfileTabScreen
-import com.gymtracker.ui.settings.SettingsScreen
 import com.gymtracker.ui.theme.HumTheme
 import com.gymtracker.ui.theme.Neon
 import com.gymtracker.ui.theme.SubText
@@ -34,19 +31,13 @@ import com.gymtracker.ui.theme.Surface
 import kotlinx.coroutines.flow.collectLatest
 
 sealed class NavScreen(val route: String, val label: String, val icon: ImageVector) {
-    object Home    : NavScreen("home",    "Log",     Icons.Default.FitnessCenter)
-    object History : NavScreen("history", "History", Icons.Default.History)
-    object Manage  : NavScreen("manage",  "Manage",  Icons.Default.Tune)
-    object Profile : NavScreen("profile", "Profile", Icons.Default.Person)
-    object Settings: NavScreen("settings","Settings",Icons.Default.Settings)
+    object Dashboard : NavScreen("dashboard", "Dashboard", Icons.Default.Dashboard)
+    object More      : NavScreen("more",      "More",      Icons.Default.MoreHoriz)
 }
 
 val BOTTOM_NAV_ITEMS = listOf(
-    NavScreen.Home,
-    NavScreen.History,
-    NavScreen.Manage,
-    NavScreen.Profile,
-    NavScreen.Settings
+    NavScreen.Dashboard,
+    NavScreen.More
 )
 
 class MainActivity : ComponentActivity() {
@@ -128,7 +119,7 @@ fun HumApp(viewModel: MainViewModel) {
                             selected = selected,
                             onClick = {
                                 navController.navigate(screen.route) {
-                                    popUpTo(NavScreen.Home.route) { saveState = true }
+                                    popUpTo(NavScreen.Dashboard.route) { saveState = true }
                                     launchSingleTop = true
                                     restoreState = true
                                 }
@@ -160,12 +151,9 @@ fun HumApp(viewModel: MainViewModel) {
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                NavHost(navController = navController, startDestination = NavScreen.Home.route) {
-                    composable(NavScreen.Home.route)     { HomeScreen(viewModel) }
-                    composable(NavScreen.History.route)  { HistoryScreen(viewModel) }
-                    composable(NavScreen.Manage.route)   { ManageScreen(viewModel) }
-                    composable(NavScreen.Profile.route)  { ProfileTabScreen(viewModel) }
-                    composable(NavScreen.Settings.route) { SettingsScreen(viewModel) }
+                NavHost(navController = navController, startDestination = NavScreen.Dashboard.route) {
+                    composable(NavScreen.Dashboard.route) { DashboardScreen(viewModel) }
+                    composable(NavScreen.More.route)      { MoreScreen(viewModel) }
                 }
             }
         }
