@@ -1,0 +1,67 @@
+# ─── Python / FastAPI ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# ─── Docker ───────────────────────────────────────────────────────────────────
+data/
+
+# ─── Android ──────────────────────────────────────────────────────────────────
+# Build outputs
+android/.gradle/
+android/app/.gradle/
+android/build/
+android/app/build/
+android/captures/
+
+# Local config (contains machine-specific SDK paths)
+android/local.properties
+
+# IntelliJ / Android Studio
+*.iml
+.idea/
+*.iws
+*.ipr
+
+# Keystore / signing
+*.jks
+*.keystore
+release/
+
+# Generated
+android/app/src/main/assets/
+
+# ─── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ─── Windows ──────────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ─── Linux ────────────────────────────────────────────────────────────────────
+*~
+.nfs*
