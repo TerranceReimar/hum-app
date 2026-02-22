@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Viewport: 108x108 (Android adaptive icon standard)
+    Safe zone: x/y 21–87 (guaranteed visible regardless of launcher mask shape)
+    Dumbbell spans x=22–86, y=38–70 — centered at (54,54), within safe zone.
+
+    Shape breakdown (left → right):
+      Left plate:        x=[22..34]  y=[38..70]  corners r=3
+      Left collar:       x=[34..40]  y=[44..64]
+      Bar:               x=[40..68]  y=[51..57]
+      Right collar:      x=[68..74]  y=[44..64]
+      Right plate:       x=[74..86]  y=[38..70]  corners r=3
+
+    Drawn as a single closed path (clockwise) so there are no seam artifacts.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#CCFF00"
+        android:pathData="
+            M 25,38
+            H 31 Q 34,38 34,41
+            V 44
+            H 40
+            V 51
+            H 68
+            V 44
+            H 74
+            V 41 Q 74,38 77,38
+            H 83 Q 86,38 86,41
+            V 67 Q 86,70 83,70
+            H 77 Q 74,70 74,67
+            V 64
+            H 68
+            V 57
+            H 40
+            V 64
+            H 34
+            V 67 Q 34,70 31,70
+            H 25 Q 22,70 22,67
+            V 41 Q 22,38 25,38
+            Z" />
+
+</vector>
